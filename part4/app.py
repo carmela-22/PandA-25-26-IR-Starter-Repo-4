@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Part 2 starter CLI (students complete manual substring search + highlighting)."""
 from typing import List, Dict, Tuple
-from .constants import BANNER, HELP
-from .sonnets import SONNETS
+from constants import BANNER, HELP
+from sonnets import SONNETS
 
 def find_spans(text: str, pattern: str):
     """Return [(start, end), ...] for all (possibly overlapping) matches.
     Inputs should already be lowercased by the caller."""
 
     spans = []
-
+    if not pattern or len(pattern) > len(text):
+        return spans
     for i in range(len(text)-len(pattern)+1):
         if text[i:i+len(pattern)] == pattern:
             spans.append((i, i + len(pattern)))
@@ -75,16 +76,46 @@ def print_results(query: str, results, highlight: bool):
 
 def combine_results(result1, result2):
     # ToDo 1) Copy your solution from exercise 3
-    combined = result1
+    result1["title_spans"] = list(result1["title_spans"]) + list(result2["title_spans"])
+    lines = result1["line_matches"]
 
+    for lm2 in result2["line_matches"]:
+        ln = lm2["line_no"]
+        i = 0
+        index = -1
+        while i < len(lines):
+            if lines[i]["line_no"] == ln:
+                index = i
+                break
+            i += 1
+
+        if index != -1:
+            lines[index]["spans"] = list(lines[index]["spans"]) + list(lm2["spans"])
+        else:
+            lines.append({
+                "line_no": ln,
+                "text": lm2["text"],
+                "spans": list(lm2["spans"]),
+            })
+
+    total = len(result1["title_spans"])
+    i = 0
+    while i < len(lines):
+        total += len(lines[i]["spans"])
+        i += 1
+    result1["matches"] = total
+
+    combined = result1
     return combined
 
 
 def main() -> None:
     # ToDo 2 - Part 1 - Introduce a new variable to store the current search mode
     highlight = True
+    search_mode = "AND"
+
     print(BANNER)
-    print()  # blank line after banner
+    print()
     while True:
         try:
             raw = input("> ").strip()
@@ -111,6 +142,15 @@ def main() -> None:
                     print("Usage: :highlight on|off")
                 continue
             # ToDo 2 - Part 1 - Copy the logic from the highlight feature and adapt it for the search-mode
+            if raw.startswith(":search-mode"):
+                parts = raw.split()
+                if len(parts) == 2 and parts[1].upper() in ("AND", "OR"):
+                    search_mode = parts[1].upper()
+                    print(f"Search mode set to {search_mode}")
+                else:
+                    print("Usage: :search-mode AND|OR")
+                continue
+
             print("Unknown command. Type :help for commands.")
             continue
 
@@ -118,7 +158,7 @@ def main() -> None:
         combined_results = []
 
         #  ToDo 1) Copy your solution from exercise 3
-        words = raw #  ... your code here ...
+        words = raw.split() #  ... your code here ...
 
         for word in words:
             # Searching for the word in all sonnets
@@ -135,12 +175,33 @@ def main() -> None:
                     result = results[i]
 
                     # ToDo 2 - Part 2: Here you have to find a way to extend for logical OR searches
-                    if combined_result["matches"] > 0 and result["matches"] > 0:
-                        # Only if we have matches in both results, we consider the sonnet (logical AND!)
-                        combined_results[i] = combine_results(combined_result, result)
+                    combined_result = combined_results[i]
+                    result = results[i]
+
+                    if search_mode == "AND":
+                        if combined_result["matches"] > 0 and result["matches"] > 0:
+                            combined_results[i] = combine_results(combined_result, result)
+                        else:
+                            combined_results[i] = {
+                                "title": combined_result["title"],
+                                "title_spans": [],
+                                "line_matches": [],
+                                "matches": 0,
+                            }
                     else:
-                        # Not in both. No match!
-                        combined_result["matches"] = 0
+                        if combined_result["matches"] > 0 and result["matches"] > 0:
+                            combined_results[i] = combine_results(combined_result, result)
+                        elif combined_result["matches"] > 0:
+                            combined_results[i] = combined_result
+                        elif result["matches"] > 0:
+                            combined_results[i] = result
+                        else:
+                            combined_results[i] = {
+                                "title": combined_result["title"],
+                                "title_spans": [],
+                                "line_matches": [],
+                                "matches": 0,
+                            }
 
         print_results(raw, combined_results, highlight)
 
