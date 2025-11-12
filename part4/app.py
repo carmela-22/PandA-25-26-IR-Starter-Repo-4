@@ -97,6 +97,15 @@ def combine_results(result1, result2):
                 "text": lm2["text"],
                 "spans": list(lm2["spans"]),
             })
+    i = 1
+    while i < len(lines):
+        item = lines[i]
+        j = i-1
+        while j>=0 and lines[j]["line_no"] > item["line_no"]:
+            lines[j+1] = lines [j]
+            j -= 1
+        lines[j+1] = item
+        i += 1
 
     total = len(result1["title_spans"])
     i = 0
